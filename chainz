@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+VERSION="Chainz 1.1"
 cmd="$1"
 pkg="$2"
 
@@ -10,6 +11,14 @@ command -v pacman >/dev/null 2>&1 || { echo "Pacman not installed"; exit 1; }
 command -v yay >/dev/null 2>&1 || { echo "Yay not installed"; exit 1; }
 command -v paru >/dev/null 2>&1 || { echo "Paru not installed"; exit 1; }
 command -v flatpak >/dev/null 2>&1 || { echo "Flatpak not installed"; exit 1; }
+
+# --------------------------
+# Version
+# --------------------------
+if [[ "$cmd" == "-v" || "$cmd" == "--version" || "$cmd" == "version" ]]; then
+    echo "$VERSION"
+    exit 0
+fi
 
 # --------------------------
 #  Chainz ( )
@@ -44,7 +53,7 @@ fi
 # -------------------------
 # Update/Upgrade (-U)
 # -------------------------
-if [[ "$cmd" == "-U" ]]; then
+if [[ "$cmd" == "-U" || "$cmd" == "upgrade" ]]; then
     echo "=== 🪢 Chainz System Upgrade ==="
     echo
 
@@ -71,26 +80,37 @@ fi
 # -------------------------
 # Help (--help)
 # -------------------------
-if [[ "$cmd" == "--help" ]]; then
+if [[ "$cmd" == "--help" || "$cmd" == "-h" || "$cmd" == "help" ]]; then
     echo "Chainz - Universal Arch Package Manager Wrapper"
+    echo "Chainz Version: $VERSION"
     echo
     echo "Usage:"
-    echo "  chainz -I <package>   Install a package (Pacman, Yay, or Flatpak)"
-    echo "  chainz -R <package>   Remove/uninstall a package"
-    echo "  chainz -U             Update all packages (Pacman, Yay, Flatpak)"
-    echo "  chainz --help         Show this help message"
+    echo "  chainz -I <package>        Install a package (Pacman, Yay, or Flatpak)"
+    echo "  chainz -R <package>        Remove/uninstall a package"
+    echo "  chainz -U                  Update all packages (Pacman, Yay, Flatpak)"
+    echo "  chainz -h                  Show this help message"
+    echo "  chainz -v                  Shows the version" 
     echo
+    echo "Long Usage:"
+    echo "  chainz install <package>   Same as -I"
+    echo "  chainz remove <package>    Same as -R"
+    echo "  chainz upgrade             Same as -U"
+    echo "  chainz help                Same as -h"
+    echo "  chainz version             Same as -v"
+    echo 
     echo "Examples:"
     echo "  chainz -I firefox"    
     echo "  chainz -R firefox"    
-    echo "  chainz -U"            
+    echo "  chainz -U"
+    echo "  chainz -h"
+    echo "  chainz -v"
     exit 0
 fi
 
 # -------------------------
 # Remove (-R)
 # -------------------------
-if [[ "$cmd" == "-R" ]]; then
+if [[ "$cmd" == "-R" || "$cmd" == "remove" ]]; then
     if [[ -z "$pkg" ]]; then
         echo "Usage: chainz -R <package>"
         exit 1
@@ -122,7 +142,7 @@ fi
 # -------------------------
 # Install (-I)
 # -------------------------
-if [[ "$cmd" == "-I" ]]; then
+if [[ "$cmd" == "-I" || "$cmd" == "install" ]]; then
     if [[ -z "$pkg" ]]; then
         echo "Usage: chainz -I <package>"
         exit 1
