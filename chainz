@@ -1,0 +1,192 @@
+#!/usr/bin/env bash
+
+cmd="$1"
+pkg="$2"
+
+# --------------------------
+#  Chainz ( )
+#  -------------------------
+if [[ -z "$cmd" ]]; then
+    echo "What do you want to do?"
+    echo "1) Install a package"
+    echo "2) Remove a package"
+    echo "3) Upgrade all packages"
+    read -p "> " action
+
+    case "$action" in
+        1)
+            read -p "Enter package name to install: " pkg
+            cmd="-I"
+            ;;
+        2)
+            read -p "Enter package name to remove: " pkg
+            cmd="-R"
+            ;;
+        3)
+            cmd="-U"
+            ;;
+        *)
+            echo "Invalid selection."
+            exit 1
+            ;;
+    esac
+fi
+
+
+# -------------------------
+# Update/Upgrade (-U)
+# -------------------------
+if [[ "$cmd" == "-U" ]]; then
+    echo "=== 🪢 Chainz System Upgrade ==="
+    echo
+
+    echo "→ Updating pacman packages..."
+    sudo pacman -Syu --noconfirm
+
+    echo
+    echo "→ Updating Yay (AUR) packages..."
+    yay -Syu --noconfirm
+
+    echo
+    echo "→ Updating Paru (AUR) packages..."
+    paru -Syu --noconfirm
+
+    echo
+    echo "→ Updating Flatpak packages..."
+    flatpak update -y
+
+    echo
+    echo "=== ✔ All package managers updated ==="
+    exit 0
+fi
+
+# -------------------------
+# Help (--help)
+# -------------------------
+if [[ "$cmd" == "--help" ]]; then
+    echo "Chainz - Universal Arch Package Manager Wrapper"
+    echo
+    echo "Usage:"
+    echo "  chainz -I <package>   Install a package (Pacman, Yay, or Flatpak)"
+    echo "  chainz -R <package>   Remove/uninstall a package"
+    echo "  chainz -U             Update all packages (Pacman, Yay, Flatpak)"
+    echo "  chainz --help         Show this help message"
+    echo
+    echo "Examples:"
+    echo "  chainz -I firefox"    
+    echo "  chainz -R firefox"    
+    echo "  chainz -U"            
+    exit 0
+fi
+
+# -------------------------
+# Remove (-R)
+# -------------------------
+if [[ "$cmd" == "-R" ]]; then
+    if [[ -z "$pkg" ]]; then
+        echo "Usage: chainz -R <package>"
+        exit 1
+    fi
+
+    echo "Where do you want to remove from?"
+    echo "1) Pacman"
+    echo "2) Yay (AUR)"
+    echo "3) Flatpak"
+    read -p "> " choice
+
+    case "$choice" in
+        1)
+            sudo pacman -R "$pkg"
+            ;;
+        2)
+            yay -R "$pkg"
+            ;;
+        3)
+            flatpak uninstall -y "$pkg"
+            ;;
+        *)
+            echo "Invalid option"
+            ;;
+    esac
+    exit 0
+fi
+
+# -------------------------
+# Install (-I)
+# -------------------------
+if [[ "$cmd" == "-I" ]]; then
+    if [[ -z "$pkg" ]]; then
+        echo "Usage: chainz -I <package>"
+        exit 1
+    fi
+
+    echo "Searching for '$pkg'…"
+
+    # ---- Pacman search ----
+    pac_results=$(pacman -Ss "$pkg" | grep -E "^[a-z0-9]" | cut -d' ' -f1)
+    echo "Pacman:"
+    echo "$pac_results"
+    echo
+
+    # ---- Yay search ----
+    search_yay() { yay -Ss "$pkg" | awk '/^aur\// {print $1}'; }
+    yay_results=($(search_yay))
+    echo "Yay:"
+    i=1
+    for r in "${yay_results[@]}"; do
+        echo "$i) $r"
+        ((i++))
+    done
+    echo
+
+    # ---- Paru search ----
+    search_paru() { paru -Ss "$pkg" | awk '/^aur\// {print $1}'; }
+    paru_results=($(search_paru))
+    echo "Paru:"
+    i=1
+    for r in "${paru_results[@]}"; do
+    echo "$i) $r"
+    ((i++))
+    done
+    echo
+
+    # ---- Flatpak search ----
+    flat_results=$(flatpak search "$pkg" | awk 'NR>1 {print $1}')
+    echo "Flatpak:"
+    echo "$flat_results"
+    echo
+
+    # ---- <<< PUT THE SELECTION BLOCK HERE >>> ----
+    echo "Where do you want to install from?"
+    echo "1) Pacman"
+    echo "2) Yay (AUR)"
+    echo "3) Paru (AUR)"
+    echo "3) Flatpak"
+    read -p "> " choice
+
+case "$choice" in
+    1) sudo pacman -S "$pkg" ;;
+    2) 
+        # existing Yay AUR selection
+        ;;
+    3)
+        # Paru AUR selection
+        if [[ ${#paru_results[@]} -eq 0 ]]; then
+            echo "No AUR packages found via Paru."
+            exit 1
+        fi
+        echo "Select AUR package number:"
+        read -p "> " parurno
+        index=$((parurno - 1))
+        if [[ $index -lt 0 || $index -ge ${#paru_results[@]} ]]; then
+            echo "Invalid selection."
+            exit 1
+        fi
+        parupkg="${paru_results[$index]}"
+        paru -S "$parupkg"
+        ;;
+    4) flatpak install -y "$pkg" ;;
+    *) echo "Invalid option" ;;
+    esac
+    exit 0
+fi
