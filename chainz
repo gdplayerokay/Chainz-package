@@ -161,7 +161,7 @@ if [[ "$cmd" == "-I" ]]; then
     echo "1) Pacman"
     echo "2) Yay (AUR)"
     echo "3) Paru (AUR)"
-    echo "3) Flatpak"
+    echo "4) Flatpak"
     read -p "> " choice
 
 case "$choice" in
