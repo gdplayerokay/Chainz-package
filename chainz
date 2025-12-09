@@ -4,8 +4,16 @@ cmd="$1"
 pkg="$2"
 
 # --------------------------
+# Check Dependencies
+# --------------------------
+command -v pacman >/dev/null 2>&1 || { echo "Pacman not installed"; exit 1; }
+command -v yay >/dev/null 2>&1 || { echo "Yay not installed"; exit 1; }
+command -v paru >/dev/null 2>&1 || { echo "Paru not installed"; exit 1; }
+command -v flatpak >/dev/null 2>&1 || { echo "Flatpak not installed"; exit 1; }
+
+# --------------------------
 #  Chainz ( )
-#  -------------------------
+# --------------------------
 if [[ -z "$cmd" ]]; then
     echo "What do you want to do?"
     echo "1) Install a package"
