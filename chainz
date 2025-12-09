@@ -1,16 +1,32 @@
 #!/usr/bin/env bash
 
-VERSION="Chainz 1.1.1 (Hotfix)"
+VERSION="Chainz 1.2 (Major Update)"
 cmd="$1"
 pkg="$2"
 
 # --------------------------
+# Update notes (notes)
+# --------------------------
+if [[ "$cmd" == "notes" ]]; then
+    echo "These are the 1.1.2 update notes:"
+    echo "1. New fuzzy find for removal and installation with fzf"
+    echo "2. Added colors to invalid options"
+    echo "3. Added installation guides for Dependencies"
+    echo "4. Update notes in /usr/bin/chainz and if you run 'chainz notes'"
+    echo "5. Fixed help menu with new options"
+    echo "6. Removal of flatpak and Paru from bugs"
+    exit 1;
+fi
+
+# --------------------------
 # Check Dependencies
 # --------------------------
-command -v pacman >/dev/null 2>&1 || { echo "Pacman not installed"; exit 1; }
-command -v yay    >/dev/null 2>&1 || { echo "Yay not installed"; exit 1; }
-command -v paru   >/dev/null 2>&1 || { echo "Paru not installed"; exit 1; }
-command -v flatpak >/dev/null 2>&1 || { echo "Flatpak not installed"; exit 1; }
+command -v fzf    >/dev/null 2>&1 || {
+    echo "fzf not installed"
+    echo "To install fzf run:"
+    echo "sudo pacman -S fzf"
+    exit 1;
+}
 
 # --------------------------
 # Version
@@ -24,26 +40,24 @@ fi
 #  Interactive Mode
 # --------------------------
 if [[ -z "$cmd" ]]; then
-    echo "What do you want to do?"
-    echo "1) Install a package"
-    echo "2) Remove a package"
-    echo "3) Upgrade all packages"
+    echo "What do you want to manage?"
+    echo "1) Install packages"
+    echo "2) Remove packages"
+    echo "3) Upgrade packages"
     read -p "> " action
 
     case "$action" in
         1)
-            read -p "Enter package name to install: " pkg
             cmd="-I"
             ;;
         2)
-            read -p "Enter package name to remove: " pkg
             cmd="-R"
             ;;
         3)
             cmd="-U"
             ;;
         *)
-            echo "Invalid selection."
+            echo -e "\e[31mInvalid Choice"
             exit 1
             ;;
     esac
@@ -53,7 +67,7 @@ fi
 # Update/Upgrade (-U)
 # -------------------------
 if [[ "$cmd" == "-U" || "$cmd" == "upgrade" ]]; then
-    echo "=== 🪢 Chainz System Upgrade ==="
+    echo "=== Chainz System Upgrade ==="
     echo
 
     echo "→ Updating pacman packages..."
@@ -64,15 +78,7 @@ if [[ "$cmd" == "-U" || "$cmd" == "upgrade" ]]; then
     yay -Syu --noconfirm
 
     echo
-    echo "→ Updating Paru (AUR) packages..."
-    paru -Syu --noconfirm
-
-    echo
-    echo "→ Updating Flatpak packages..."
-    flatpak update -y
-
-    echo
-    echo "=== ✔ All package managers updated ==="
+    echo "=== All package managers updated ==="
     exit 0
 fi
 
@@ -89,12 +95,22 @@ if [[ "$cmd" == "--help" || "$cmd" == "-h" || "$cmd" == "help" ]]; then
     echo "  chainz -U                  Update all packages"
     echo "  chainz -h                  Show this help"
     echo "  chainz -v                  Show version"
+    echo "  chainz notes               Show update notes"
+    echo
+    echo "Long Usage:"
+    echo "  chainz install <packages>  Same as -I"
+    echo "  chainz remove <packages>   Same as -R"
+    echo "  chainz upgrade             Same as -U"
+    echo "  chainz help                same as -h"
+    echo "  chainz version             same as -v"
     echo
     echo "Examples:"
     echo "  chainz -I firefox"
     echo "  chainz -R firefox"
     echo "  chainz -U"
+    echo "  chainz -h"
     echo "  chainz -v"
+    echo "  chainz notes"
     exit 0
 fi
 
@@ -102,23 +118,30 @@ fi
 # Remove (-R)
 # -------------------------
 if [[ "$cmd" == "-R" || "$cmd" == "remove" ]]; then
-    if [[ -z "$pkg" ]]; then
-        echo "Usage: chainz -R <package>"
+    # List installed pacman packages
+    mapfile -t pacman_pkgs < <(pacman -Q | awk '{print $1}')
+    if [[ ${#pacman_pkgs[@]} -eq 0 ]]; then
+        echo "No pacman packages installed."
         exit 1
     fi
 
-    echo "Where do you want to remove from?"
-    echo "1) Pacman"
-    echo "2) Yay (AUR)"
-    echo "3) Flatpak"
-    read -p "> " choice
+    # Check if fzf is installed
+    if ! command -v fzf >/dev/null 2>&1; then
+        echo "fzf not found. Installing it..."
+        sudo pacman -S --noconfirm fzf
+    fi
 
-    case "$choice" in
-        1) sudo pacman -R "$pkg" ;;
-        2) yay -R "$pkg" ;;
-        3) flatpak uninstall -y "$pkg" ;;
-        *) echo "Invalid option" ;;
-    esac
+    # Use fzf to select package
+    echo "Select Pacman package to remove (start typing to fuzzy search):"
+    pkg_to_remove=$(printf "%s\n" "${pacman_pkgs[@]}" | fzf --prompt="Package> ")
+
+    if [[ -z "$pkg_to_remove" ]]; then
+        echo "No package selected."
+        exit 1
+    fi
+
+    echo "Removing package: $pkg_to_remove"
+    sudo pacman -R "$pkg_to_remove"
     exit 0
 fi
 
@@ -126,100 +149,69 @@ fi
 # Install (-I)
 # -------------------------
 if [[ "$cmd" == "-I" || "$cmd" == "install" ]]; then
-    if [[ -z "$pkg" ]]; then
-        echo "Usage: chainz -I <package>"
+
+    # Check if fzf is installed
+    if ! command -v fzf >/dev/null 2>&1; then
+        echo "fzf not found. Installing it..."
+        sudo pacman -S --noconfirm fzf
+    fi
+
+    # Ask which package manager to use
+    echo "Select the package manager:"
+    manager=$(printf "%s\n" "Pacman" "Yay" | fzf --prompt="Package manager> " --height 10% --reverse)
+
+    if [[ -z "$manager" ]]; then
+        echo "No package manager selected."
         exit 1
     fi
 
-    echo "Searching for '$pkg'…"
+    # Fetch package list and fuzzy find
+    case "$manager" in
+        Pacman)
+            echo "Fetching Pacman packages..."
+            pkgs=($(pacman -Sl | awk '{print $2}'))
+            ;;
+        Yay)
+            echo "Fetching Yay (AUR) packages..."
+            pkgs=($(yay -Ssq))
+            ;;
+        Paru)
+            echo "Fetching Paru (AUR) packages..."
+            # Use paru -Ss without a query and extract package names
+            pkgs=($(paru -S -Q --aur --list | awk '{print $1}'))
+            # Alternative: `paru -Ssq <search>` won't work without a search term
+            ;;
+        *)
+            echo "Invalid package manager."
+            exit 1
+            ;;
+    esac
 
-    # ---- Pacman search ----
-    pac_results=$(pacman -Ss "$pkg" | grep -E "^[a-z0-9]" | cut -d' ' -f1)
-    echo "Pacman:"
-    echo "$pac_results"
-    echo
+    if [[ ${#pkgs[@]} -eq 0 ]]; then
+        echo "No packages found for $manager."
+        exit 1
+    fi
 
-    # ---- Yay search ----
-    yay_results=($(yay -Ss "$pkg" | awk '/^aur\// {print $1}'))
-    echo "Yay:"
-    i=1
-    for r in "${yay_results[@]}"; do
-        echo "$i) $r"
-        ((i++))
-    done
-    echo
+    # Fuzzy select the package
+    pkg=$(printf "%s\n" "${pkgs[@]}" | fzf --prompt="Select package> " --height 20% --reverse)
+    if [[ -z "$pkg" ]]; then
+        echo "No package selected."
+        exit 1
+    fi
 
-    # ---- Paru search ----
-    paru_results=($(paru -Ss "$pkg" | awk '/^aur\// {print $1}'))
-    echo "Paru:"
-    i=1
-    for r in "${paru_results[@]}"; do
-        echo "$i) $r"
-        ((i++))
-    done
-    echo
-
-    # ---- Flatpak search ----
-    flat_results=$(flatpak search "$pkg" | awk 'NR>1 {print $1}')
-    echo "Flatpak:"
-    echo "$flat_results"
-    echo
-
-    echo "Where do you want to install from?"
-    echo "1) Pacman"
-    echo "2) Yay (AUR)"
-    echo "3) Paru (AUR)"
-    echo "4) Flatpak"
-    read -p "> " choice
-
-    case "$choice" in
-        1)
+    # Install the selected package
+    echo "Installing $pkg via $manager..."
+    case "$manager" in
+        Pacman)
             sudo pacman -S "$pkg"
             ;;
-
-        2)
-            # Yay AUR selection
-            if [[ ${#yay_results[@]} -eq 0 ]]; then
-                echo "No AUR packages found via Yay."
-                exit 1
-            fi
-            echo "Select AUR package number:"
-            read -p "> " yayno
-            index=$((yayno - 1))
-            if [[ $index -lt 0 || $index -ge ${#yay_results[@]} ]]; then
-                echo "Invalid selection."
-                exit 1
-            fi
-            yaypkg="${yay_results[$index]}"
-            yay -S "$yaypkg"
+        Yay)
+            yay -S "$pkg"
             ;;
-
-        3)
-            # Paru AUR selection
-            if [[ ${#paru_results[@]} -eq 0 ]]; then
-                echo "No AUR packages found via Paru."
-                exit 1
-            fi
-            echo "Select AUR package number:"
-            read -p "> " parurno
-            index=$((parurno - 1))
-            if [[ $index -lt 0 || $index -ge ${#paru_results[@]} ]]; then
-                echo "Invalid selection."
-                exit 1
-            fi
-            parupkg="${paru_results[$index]}"
-            paru -S "$parupkg"
-            ;;
-
-        4)
-            flatpak install -y "$pkg"
-            ;;
-
-        *)
-            echo "Invalid option"
+        Paru)
+            paru -S "$pkg"
             ;;
     esac
 
     exit 0
 fi
-
