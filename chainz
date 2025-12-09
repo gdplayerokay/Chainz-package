@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-VERSION="Chainz 1.1"
+VERSION="Chainz 1.1.1 (Hotfix)"
 cmd="$1"
 pkg="$2"
 
@@ -8,8 +8,8 @@ pkg="$2"
 # Check Dependencies
 # --------------------------
 command -v pacman >/dev/null 2>&1 || { echo "Pacman not installed"; exit 1; }
-command -v yay >/dev/null 2>&1 || { echo "Yay not installed"; exit 1; }
-command -v paru >/dev/null 2>&1 || { echo "Paru not installed"; exit 1; }
+command -v yay    >/dev/null 2>&1 || { echo "Yay not installed"; exit 1; }
+command -v paru   >/dev/null 2>&1 || { echo "Paru not installed"; exit 1; }
 command -v flatpak >/dev/null 2>&1 || { echo "Flatpak not installed"; exit 1; }
 
 # --------------------------
@@ -21,7 +21,7 @@ if [[ "$cmd" == "-v" || "$cmd" == "--version" || "$cmd" == "version" ]]; then
 fi
 
 # --------------------------
-#  Chainz ( )
+#  Interactive Mode
 # --------------------------
 if [[ -z "$cmd" ]]; then
     echo "What do you want to do?"
@@ -48,7 +48,6 @@ if [[ -z "$cmd" ]]; then
             ;;
     esac
 fi
-
 
 # -------------------------
 # Update/Upgrade (-U)
@@ -85,24 +84,16 @@ if [[ "$cmd" == "--help" || "$cmd" == "-h" || "$cmd" == "help" ]]; then
     echo "Chainz Version: $VERSION"
     echo
     echo "Usage:"
-    echo "  chainz -I <package>        Install a package (Pacman, Yay, or Flatpak)"
-    echo "  chainz -R <package>        Remove/uninstall a package"
-    echo "  chainz -U                  Update all packages (Pacman, Yay, Flatpak)"
-    echo "  chainz -h                  Show this help message"
-    echo "  chainz -v                  Shows the version" 
+    echo "  chainz -I <package>        Install a package"
+    echo "  chainz -R <package>        Remove a package"
+    echo "  chainz -U                  Update all packages"
+    echo "  chainz -h                  Show this help"
+    echo "  chainz -v                  Show version"
     echo
-    echo "Long Usage:"
-    echo "  chainz install <package>   Same as -I"
-    echo "  chainz remove <package>    Same as -R"
-    echo "  chainz upgrade             Same as -U"
-    echo "  chainz help                Same as -h"
-    echo "  chainz version             Same as -v"
-    echo 
     echo "Examples:"
-    echo "  chainz -I firefox"    
-    echo "  chainz -R firefox"    
+    echo "  chainz -I firefox"
+    echo "  chainz -R firefox"
     echo "  chainz -U"
-    echo "  chainz -h"
     echo "  chainz -v"
     exit 0
 fi
@@ -123,18 +114,10 @@ if [[ "$cmd" == "-R" || "$cmd" == "remove" ]]; then
     read -p "> " choice
 
     case "$choice" in
-        1)
-            sudo pacman -R "$pkg"
-            ;;
-        2)
-            yay -R "$pkg"
-            ;;
-        3)
-            flatpak uninstall -y "$pkg"
-            ;;
-        *)
-            echo "Invalid option"
-            ;;
+        1) sudo pacman -R "$pkg" ;;
+        2) yay -R "$pkg" ;;
+        3) flatpak uninstall -y "$pkg" ;;
+        *) echo "Invalid option" ;;
     esac
     exit 0
 fi
@@ -157,8 +140,7 @@ if [[ "$cmd" == "-I" || "$cmd" == "install" ]]; then
     echo
 
     # ---- Yay search ----
-    search_yay() { yay -Ss "$pkg" | awk '/^aur\// {print $1}'; }
-    yay_results=($(search_yay))
+    yay_results=($(yay -Ss "$pkg" | awk '/^aur\// {print $1}'))
     echo "Yay:"
     i=1
     for r in "${yay_results[@]}"; do
@@ -168,13 +150,12 @@ if [[ "$cmd" == "-I" || "$cmd" == "install" ]]; then
     echo
 
     # ---- Paru search ----
-    search_paru() { paru -Ss "$pkg" | awk '/^aur\// {print $1}'; }
-    paru_results=($(search_paru))
+    paru_results=($(paru -Ss "$pkg" | awk '/^aur\// {print $1}'))
     echo "Paru:"
     i=1
     for r in "${paru_results[@]}"; do
-    echo "$i) $r"
-    ((i++))
+        echo "$i) $r"
+        ((i++))
     done
     echo
 
@@ -184,7 +165,6 @@ if [[ "$cmd" == "-I" || "$cmd" == "install" ]]; then
     echo "$flat_results"
     echo
 
-    # ---- <<< PUT THE SELECTION BLOCK HERE >>> ----
     echo "Where do you want to install from?"
     echo "1) Pacman"
     echo "2) Yay (AUR)"
@@ -192,29 +172,54 @@ if [[ "$cmd" == "-I" || "$cmd" == "install" ]]; then
     echo "4) Flatpak"
     read -p "> " choice
 
-case "$choice" in
-    1) sudo pacman -S "$pkg" ;;
-    2) 
-        # existing Yay AUR selection
-        ;;
-    3)
-        # Paru AUR selection
-        if [[ ${#paru_results[@]} -eq 0 ]]; then
-            echo "No AUR packages found via Paru."
-            exit 1
-        fi
-        echo "Select AUR package number:"
-        read -p "> " parurno
-        index=$((parurno - 1))
-        if [[ $index -lt 0 || $index -ge ${#paru_results[@]} ]]; then
-            echo "Invalid selection."
-            exit 1
-        fi
-        parupkg="${paru_results[$index]}"
-        paru -S "$parupkg"
-        ;;
-    4) flatpak install -y "$pkg" ;;
-    *) echo "Invalid option" ;;
+    case "$choice" in
+        1)
+            sudo pacman -S "$pkg"
+            ;;
+
+        2)
+            # Yay AUR selection
+            if [[ ${#yay_results[@]} -eq 0 ]]; then
+                echo "No AUR packages found via Yay."
+                exit 1
+            fi
+            echo "Select AUR package number:"
+            read -p "> " yayno
+            index=$((yayno - 1))
+            if [[ $index -lt 0 || $index -ge ${#yay_results[@]} ]]; then
+                echo "Invalid selection."
+                exit 1
+            fi
+            yaypkg="${yay_results[$index]}"
+            yay -S "$yaypkg"
+            ;;
+
+        3)
+            # Paru AUR selection
+            if [[ ${#paru_results[@]} -eq 0 ]]; then
+                echo "No AUR packages found via Paru."
+                exit 1
+            fi
+            echo "Select AUR package number:"
+            read -p "> " parurno
+            index=$((parurno - 1))
+            if [[ $index -lt 0 || $index -ge ${#paru_results[@]} ]]; then
+                echo "Invalid selection."
+                exit 1
+            fi
+            parupkg="${paru_results[$index]}"
+            paru -S "$parupkg"
+            ;;
+
+        4)
+            flatpak install -y "$pkg"
+            ;;
+
+        *)
+            echo "Invalid option"
+            ;;
     esac
+
     exit 0
 fi
+
