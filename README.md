@@ -1,5 +1,5 @@
 # Chainz-package
-Chainz is a package manager that allows you to install update and remove apps from paru yay flatpak and pacman from one linux comand.
+Chainz is a package manager that allows you to install update and remove from one arch linux comand.
 
 Package manager surport:
 Flatpak
