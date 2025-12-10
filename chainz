@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-VERSION="Chainz 1.2 (Major Update)"
+VERSION="Chainz 1.3 (Major Update)"
 cmd="$1"
 pkg="$2"
 
@@ -8,13 +8,9 @@ pkg="$2"
 # Update notes (notes)
 # --------------------------
 if [[ "$cmd" == "notes" ]]; then
-    echo "These are the 1.1.2 update notes:"
-    echo "1. New fuzzy find for removal and installation with fzf"
-    echo "2. Added colors to invalid options"
-    echo "3. Added installation guides for Dependencies"
-    echo "4. Update notes in /usr/bin/chainz and if you run 'chainz notes'"
-    echo "5. Fixed help menu with new options"
-    echo "6. Removal of flatpak and Paru from bugs"
+    echo "These are the 1.2.1 update notes:"
+    echo "1. New UI upgrades With fzf"
+    echo "2. Readition of flatpak"
     exit 1;
 fi
 
@@ -37,24 +33,24 @@ if [[ "$cmd" == "-v" || "$cmd" == "--version" || "$cmd" == "version" ]]; then
 fi
 
 # --------------------------
-#  Interactive Mode
+#  Interactive Mode (Now fzf)
 # --------------------------
 if [[ -z "$cmd" ]]; then
-    echo "What do you want to manage?"
-    echo "1) Install packages"
-    echo "2) Remove packages"
-    echo "3) Upgrade packages"
-    read -p "> " action
+    cmd=$(printf "Install packages\nRemove packages\nUpgrade packages\nExit" | \
+        fzf --prompt="What do you want to do? > " --height=10% --reverse --border)
 
-    case "$action" in
-        1)
+    case "$cmd" in
+        "Install packages")
             cmd="-I"
             ;;
-        2)
+        "Remove packages")
             cmd="-R"
             ;;
-        3)
+        "Upgrade packages")
             cmd="-U"
+            ;;
+        "Exit"|"")
+            exit 0
             ;;
         *)
             echo -e "\e[31mInvalid Choice"
@@ -118,12 +114,6 @@ fi
 # Remove (-R)
 # -------------------------
 if [[ "$cmd" == "-R" || "$cmd" == "remove" ]]; then
-    # List installed pacman packages
-    mapfile -t pacman_pkgs < <(pacman -Q | awk '{print $1}')
-    if [[ ${#pacman_pkgs[@]} -eq 0 ]]; then
-        echo "No pacman packages installed."
-        exit 1
-    fi
 
     # Check if fzf is installed
     if ! command -v fzf >/dev/null 2>&1; then
@@ -131,17 +121,56 @@ if [[ "$cmd" == "-R" || "$cmd" == "remove" ]]; then
         sudo pacman -S --noconfirm fzf
     fi
 
-    # Use fzf to select package
-    echo "Select Pacman package to remove (start typing to fuzzy search):"
-    pkg_to_remove=$(printf "%s\n" "${pacman_pkgs[@]}" | fzf --prompt="Package> ")
+    # Ask user if they want to remove Pacman or Flatpak package
+    echo "Select package type to remove:"
+    pkg_type=$(printf "Pacman\nFlatpak" | fzf --prompt="Type> " --height 10% --reverse --border)
 
-    if [[ -z "$pkg_to_remove" ]]; then
-        echo "No package selected."
+    if [[ "$pkg_type" == "Pacman" ]]; then
+        # List installed pacman packages
+        mapfile -t pacman_pkgs < <(pacman -Q | awk '{print $1}')
+        if [[ ${#pacman_pkgs[@]} -eq 0 ]]; then
+            echo "No pacman packages installed."
+            exit 1
+        fi
+
+        # Use fzf to select package
+        echo "Select Pacman package to remove (start typing to fuzzy search):"
+        pkg_to_remove=$(printf "%s\n" "${pacman_pkgs[@]}" | fzf --prompt="Package> " --height 10% --reverse --border)
+
+        if [[ -z "$pkg_to_remove" ]]; then
+            echo "No package selected."
+            exit 1
+        fi
+
+        echo "Removing package: $pkg_to_remove"
+        sudo pacman -R "$pkg_to_remove"
+
+    elif [[ "$pkg_type" == "Flatpak" ]]; then
+        # List installed flatpak applications
+        mapfile -t flatpak_pkgs < <(flatpak list --app --columns=application)
+
+        if [[ ${#flatpak_pkgs[@]} -eq 0 ]]; then
+            echo "No Flatpak packages installed."
+            exit 1
+        fi
+
+        # Use fzf to select package
+        echo "Select Flatpak package to remove (start typing to fuzzy search):"
+        pkg_to_remove=$(printf "%s\n" "${flatpak_pkgs[@]}" | fzf --prompt="Package> " --height 10% --reverse --border)
+
+        if [[ -z "$pkg_to_remove" ]]; then
+            echo "No package selected."
+            exit 1
+        fi
+
+        echo "Removing Flatpak package: $pkg_to_remove"
+        flatpak uninstall -y "$pkg_to_remove"
+
+    else
+        echo "No package type selected."
         exit 1
     fi
 
-    echo "Removing package: $pkg_to_remove"
-    sudo pacman -R "$pkg_to_remove"
     exit 0
 fi
 
@@ -158,7 +187,7 @@ if [[ "$cmd" == "-I" || "$cmd" == "install" ]]; then
 
     # Ask which package manager to use
     echo "Select the package manager:"
-    manager=$(printf "%s\n" "Pacman" "Yay" | fzf --prompt="Package manager> " --height 10% --reverse)
+    manager=$(printf "%s\n" "Pacman" "Yay" "Flatpak" | fzf --prompt="Package manager> " --height 10% --reverse --border)
 
     if [[ -z "$manager" ]]; then
         echo "No package manager selected."
@@ -175,11 +204,9 @@ if [[ "$cmd" == "-I" || "$cmd" == "install" ]]; then
             echo "Fetching Yay (AUR) packages..."
             pkgs=($(yay -Ssq))
             ;;
-        Paru)
-            echo "Fetching Paru (AUR) packages..."
-            # Use paru -Ss without a query and extract package names
-            pkgs=($(paru -S -Q --aur --list | awk '{print $1}'))
-            # Alternative: `paru -Ssq <search>` won't work without a search term
+        Flatpak)
+            echo "Fetching Flatpak packages..."
+            pkgs=($(flatpak search "" | awk '{print $1}'))
             ;;
         *)
             echo "Invalid package manager."
@@ -193,7 +220,7 @@ if [[ "$cmd" == "-I" || "$cmd" == "install" ]]; then
     fi
 
     # Fuzzy select the package
-    pkg=$(printf "%s\n" "${pkgs[@]}" | fzf --prompt="Select package> " --height 20% --reverse)
+    pkg=$(printf "%s\n" "${pkgs[@]}" | fzf --prompt="Select package> " --height 10% --reverse --border)
     if [[ -z "$pkg" ]]; then
         echo "No package selected."
         exit 1
@@ -208,8 +235,8 @@ if [[ "$cmd" == "-I" || "$cmd" == "install" ]]; then
         Yay)
             yay -S "$pkg"
             ;;
-        Paru)
-            paru -S "$pkg"
+        Flatpak)
+            flatpak install "$pkg"
             ;;
     esac
 
