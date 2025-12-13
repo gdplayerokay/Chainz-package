@@ -1,14 +1,15 @@
 # Chainz-package
-Chainz is a package manager that allows you to install update and remove from one arch linux comand.
+Chainz is a package manager that allows you to install update and remove from one linux comand.
 
 Package manager surport:
 Flatpak
 yay
 pacman
+apt
+dnf
 
-Installation guide
-yay -S chainz (thats it)
+run the install.sh script
 
 These are the 1.3 update notes:"
-1. Added Fzf TUI
-2. Added flatpak
+1. Apt support
+2. Dnf support
