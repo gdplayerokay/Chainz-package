@@ -10,6 +10,6 @@ dnf
 
 run the install.sh script
 
-These are the 1.3 update notes:"
+These are the 1.4 update notes:"
 1. Apt support
 2. Dnf support
